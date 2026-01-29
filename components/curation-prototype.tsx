@@ -21,7 +21,7 @@ export default function CurationPrototype() {
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const { mutate, data, isPending, error } = useCuration();
+  const { mutate } = useCuration();
 
   const handleOnSubmit = () => {
     if (!query.trim()) return;
