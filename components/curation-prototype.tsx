@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 
-import { ChatMessage } from "@/components/ui/chat-message";
+import { ChatMessage, ChatMessageCard } from "@/components/ui/chat-message";
 import { HeaderTitle } from "@react-navigation/elements";
 import { useCuration } from "./hook/useCuration";
 import { IconSymbol } from "./ui/icon-symbol";
@@ -22,10 +22,6 @@ export default function CurationPrototype() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const { mutate, data, isPending, error } = useCuration();
-
-  // console.log("data, isPending, error", data);
-
-  console.log("DATA", JSON.stringify(data));
 
   const handleOnSubmit = () => {
     if (!query.trim()) return;
@@ -63,9 +59,8 @@ export default function CurationPrototype() {
   };
 
   const suggestionChips = [
-    "How is Reddit is performing?",
-    "Analyze Tesla stock",
-    "What's trending in stocks?",
+    "What are investors saying about Tesla?",
+    "What about their competition from China?",
   ];
 
   const handleSuggestion = (suggestion: string) => {
@@ -122,12 +117,10 @@ export default function CurationPrototype() {
 
         // Add assistant response to messages
         const assistantMessage: ChatMessage = {
-          id: response.message_id || `msg_${Date.now()}`,
+          id: response.message.message_id || `msg_${Date.now()}`,
           role: "assistant",
-          content:
-            response.answer || response.content || "No response received",
-          created_at: new Date().toISOString(),
-          graph: response.graph,
+          content: response.message.content || "No response received",
+          created_at: response.message.timestamp || new Date().toISOString(),
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
@@ -191,10 +184,9 @@ export default function CurationPrototype() {
         ) : (
           <>
             <View style={styles.messagesList}>
-              {/* {messages.map((message) => (
+              {messages.map((message) => (
                 <ChatMessageCard key={message.id} message={message} />
-              ))} */}
-              <Text style={{ color: "#FFFFFF" }}>{data.message.content}</Text>
+              ))}
               {loading && (
                 <View style={styles.loadingContainer}>
                   <Text style={styles.loadingText}>T H I N K I N G...</Text>
