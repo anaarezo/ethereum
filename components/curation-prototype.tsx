@@ -11,14 +11,56 @@ import {
   View,
 } from "react-native";
 
-import { ChatMessage, ChatMessageCard } from "@/components/ui/chat-message";
+import { ChatMessage } from "@/components/ui/chat-message";
 import { HeaderTitle } from "@react-navigation/elements";
+import { useCuration } from "./hook/useCuration";
 import { IconSymbol } from "./ui/icon-symbol";
 
 export default function CurationPrototype() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const { mutate, data, isPending, error } = useCuration();
+
+  // console.log("data, isPending, error", data);
+
+  console.log("DATA", JSON.stringify(data));
+
+  const handleOnSubmit = () => {
+    if (!query.trim()) return;
+
+    const payload = {
+      message: query,
+      conversation_id: conversationId,
+      conversation_topic: null,
+      context: {
+        previous_messages: messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        summary_checkpoint: null,
+      },
+      metadata: {
+        type: conversationId ? "follow_up" : "new",
+        user_id: "user_12345",
+        session_id: "sess_abc123",
+        timestamp: new Date().toISOString(),
+        message_index: messages.length + 1,
+      },
+    };
+
+    mutate(payload, {
+      onSuccess: (response) => {
+        console.log("Success:", response);
+        // Handle success - update UI with response
+      },
+      onError: (err) => {
+        console.error("Error:", err);
+        // Handle error - show error message to user
+      },
+    });
+  };
 
   const suggestionChips = [
     "How is Reddit is performing?",
@@ -32,7 +74,7 @@ export default function CurationPrototype() {
 
   const hasContent = messages.length > 0;
 
-  async function handleAsk() {
+  function handleAsk() {
     if (!query.trim()) return;
     setLoading(true);
     const currentQuery = query;
@@ -47,43 +89,66 @@ export default function CurationPrototype() {
     setMessages((prev) => [...prev, userMessage]);
     setQuery("");
 
-    // Simulate API response but this should correctly moved to a context for now it's living here.
-    setTimeout(() => {
-      // Mock response with table data for demonstration
-      const assistantMessage: ChatMessage = {
-        id: `msg_${Date.now()}`,
-        role: "assistant",
-        content:
-          "Reddit's primary revenue sources can be summarized as follows:\n\n1. **Advertising Revenue**: This is the most significant revenue source for Reddit. In recent quarters, ad revenue has shown substantial growth.\n   - In Q2 of 2025, advertising revenue reached approximately **$465 million**, growing **84% year-over-year**【4:1†source】.\n   - For Q3 2024, ad revenue was **$315.1 million**, reflecting a **56% year-over-year growth**【4:8†source】.\n   - In Q4 2024, advertising revenue further climbed to **$395 million**, growing **60% year-over-year**【4:10†source】.\n\n2. **Other Revenue**: This includes income from various sources, such as data licensing.\n   - In Q2 of 2025, other revenue accounted for **$35 million**, which was a **24% year-over-year increase**【4:1†source】.\n   - During the same quarter, the overall revenue reached **$500 million**, showing a growth trajectory across various monetization strategies【4:1†source】【4:18†source】.\n\n3. **Performance and Brand Advertising**: Both performance-based ads and brand ads contribute substantially to overall advertising revenue. Over **60% of total ad revenue** comes from performance ads, highlighting the trend of advertisers focusing on measurable outcomes【4:1†source】【4:14†source】.\n\n4. **International Growth**: As Reddit expands internationally, revenue growth is also seen in these markets, which adds to the overall financial performance【4:4†source】【4:11†source】.\n\nIn conclusion, Reddit relies heavily on its advertising business for revenue generation, complemented by growing contributions from other revenue streams such as data licensing.\n\nHere's a summary table of recent revenue figures:\n\n| Quarter       | Total Revenue | Advertising Revenue | Other Revenue | Year-over-Year Growth |\n|---------------|---------------|---------------------|---------------|-----------------------|\n| Q2 2025       | $500 million  | $465 million        | $35 million   | 78%                   |\n| Q3 2024       | $348.4 million| $315.1 million      | $33.2 million | 68%                   |\n| Q4 2024       | $428 million  | $395 million        | -             | 71%                   |",
-        created_at: new Date().toISOString(),
-        graph: [
-          {
-            Quarter: "Q2 2025",
-            "Total Revenue": 500,
-            "Advertising Revenue": 465,
-            "Other Revenue": 35,
-            "Year-over-Year Growth": "78%",
-          },
-          {
-            Quarter: "Q3 2024",
-            "Total Revenue": 348.4,
-            "Advertising Revenue": 315.1,
-            "Other Revenue": 33.2,
-            "Year-over-Year Growth": "68%",
-          },
-          {
-            Quarter: "Q4 2024",
-            "Total Revenue": 428,
-            "Advertising Revenue": 395,
-            "Other Revenue": null,
-            "Year-over-Year Growth": "71%",
-          },
-        ],
-      };
+    // Build payload for API
+    const payload = {
+      message: currentQuery,
+      conversation_id: conversationId,
+      conversation_topic: null,
+      context: {
+        previous_messages: messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        summary_checkpoint: null,
+      },
+      metadata: {
+        type: conversationId ? "follow_up" : "new",
+        user_id: "user_12345", // TODO: Replace with actual user ID
+        session_id: "sess_abc123", // TODO: Replace with actual session ID
+        timestamp: new Date().toISOString(),
+        message_index: messages.length + 1,
+      },
+    };
 
-      setMessages((prev) => [...prev, assistantMessage]);
-      setLoading(false);
-    }, 1200);
+    // Call the mutation
+    mutate(payload, {
+      onSuccess: (response) => {
+        console.log("API Response:", response);
+
+        // Update conversation ID if this is a new conversation
+        if (!conversationId && response.conversation_id) {
+          setConversationId(response.conversation_id);
+        }
+
+        // Add assistant response to messages
+        const assistantMessage: ChatMessage = {
+          id: response.message_id || `msg_${Date.now()}`,
+          role: "assistant",
+          content:
+            response.answer || response.content || "No response received",
+          created_at: new Date().toISOString(),
+          graph: response.graph,
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+        setLoading(false);
+      },
+      onError: (err) => {
+        console.error("API Error:", err);
+
+        // Add error message to chat
+        const errorMessage: ChatMessage = {
+          id: `error_${Date.now()}`,
+          role: "assistant",
+          content:
+            "Sorry, I encountered an error processing your request. Please try again.",
+          created_at: new Date().toISOString(),
+        };
+
+        setMessages((prev) => [...prev, errorMessage]);
+        setLoading(false);
+      },
+    });
   }
 
   return (
@@ -126,9 +191,10 @@ export default function CurationPrototype() {
         ) : (
           <>
             <View style={styles.messagesList}>
-              {messages.map((message) => (
+              {/* {messages.map((message) => (
                 <ChatMessageCard key={message.id} message={message} />
-              ))}
+              ))} */}
+              <Text style={{ color: "#FFFFFF" }}>{data.message.content}</Text>
               {loading && (
                 <View style={styles.loadingContainer}>
                   <Text style={styles.loadingText}>T H I N K I N G...</Text>
